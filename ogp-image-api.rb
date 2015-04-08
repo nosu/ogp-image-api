@@ -1,5 +1,5 @@
 require 'open-uri'
-require 'minimagick'
+require 'mini_magick'
 require 'nokogiri'
 
 module OgpImageApi
@@ -75,7 +75,6 @@ module OgpImageApi
       doc = Nokogiri::HTML(open(@url))
       doc.
     end
-
   end
 end
 
