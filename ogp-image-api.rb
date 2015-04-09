@@ -1,66 +1,78 @@
-require 'open-uri'
+# coding: utf-8
+
+require 'grape'
+require 'redis'
 require 'mini_magick'
 require 'nokogiri'
+require 'open-uri'
+require 'open_uri_redirections'
 
-module OgpImageApi
+module OgpImageAPI
   class API < Grape::API
     version 'v1', using: :header, vendor: 'nosu'
     format :json
     prefix :api
-
+  
     helpers do
-      def get_image_url
-      end
-
-      def resize_image
-
-      end
     end
 
-    resource :reduced_ogp_image do
+    resource :test do
+      desc "For testing."
+      get :test do
+        "Test Success"
+      end
+    end
+  
+    resource :og_image do
       desc "Return a ogp image."
       params do
-        requires :url, type: String, regexp: /URI::regexp/, desc: "Target URL."
+        requires :url, type: String, desc: "Target URL."
       end
+  
       route_param :url do
         get do
-          image = OgpImage.new(params[:url])
+          url = URI.decode(params[:url])
+          puts url
+          image = OgpImage.new(url)
           image.get_reduced_image
         end
       end
+  
     end
   end
-
+  
   class OgpImage
-    def initalize(url)
+    def initialize(url)
       @url = url
-      @redis = Redis.new(:path => "/tmp/redis.sock")
+      @image_url = get_ogp_image_url
+      @redis = Redis.new(:host => "localhost", :port => 6379)
       @max_length = 500
     end
-
+  
     def get_reduced_image
+      return nil if @image_url == nil
       image = get_cached_image
       if !(image)
         add_image_cache
       end
     end
-
+  
     def get_cached_image
       @redis.get @url
     end
-
+  
     def add_image_cache
-      reduced_image = reduce_image
-      if reduced_image == null
+      reduced_image = download_reduced_image
+      if reduced_image == nil
         error
       else
-        @redis.set(@url, image)
-        image
+        @redis.set(@url, reduced_image)
+        reduced_image
       end
     end
-
-    def reduce_image
-      image = MiniMagick::Image.open(@url)
+  
+    def download_reduced_image
+      image = MiniMagick::Image.open(@image_url)
       x = image.height
       y = image.width
       if x < y
@@ -68,14 +80,17 @@ module OgpImageApi
       else
         image.resize "#{@max_length}x#{@max_length * y/x}"
       end
-      image.to_blog
+      image.to_blob
     end
-
+  
     def get_ogp_image_url
-      doc = Nokogiri::HTML(open(@url))
-      doc.
+      doc = Nokogiri::HTML(open(@url, :allow_redirections => :all))
+      og_image = doc.at_xpath('//meta[@property="og:image"]/@content')
+      if og_image
+        og_image.value
+      else
+        nil
+      end
     end
   end
 end
-
-run OgpImageApi::API
