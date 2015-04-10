@@ -8,6 +8,7 @@ require 'open-uri'
 require 'open_uri_redirections'
 
 module OgpImageAPI
+
   class API < Grape::API
     content_type :binary, 'application/octet-stream'
     format :binary
@@ -21,8 +22,11 @@ module OgpImageAPI
       route_param :url do
         get do
           url = URI.decode(params[:url])
-          puts url
+
           image = OgpImage.new(url)
+          if image.empty?
+            error! 'og:image does not exist.', 404
+          end
           image.get_reduced_image
         end
       end
@@ -38,17 +42,21 @@ module OgpImageAPI
       @redis = Redis.new(:host => "localhost", :port => 6379)
       @max_length = 500
     end
+
+    def empty?
+      true if @image_url == nil
+    end
   
     def get_reduced_image
-      return nil if @image_url == nil
       image = get_cached_image
-      if !(image)
-        add_image_cache
+      if image == nil
+        image = add_image_cache
       end
+      image
     end
   
     def get_cached_image
-      @redis.get @url
+      @redis.get(@url)
     end
   
     def add_image_cache
@@ -65,10 +73,12 @@ module OgpImageAPI
       image = MiniMagick::Image.open(@image_url)
       x = image.height
       y = image.width
-      if x < y
-        image.resize "#{@max_length * x/y}x#{@max_length}"
-      else
-        image.resize "#{@max_length}x#{@max_length * y/x}"
+      unless x < @max_length && y < @max_length
+        if x < y
+          image.resize "#{@max_length * x/y}x#{@max_length}"
+        else
+          image.resize "#{@max_length}x#{@max_length * y/x}"
+        end
       end
       image.to_blob
     end
