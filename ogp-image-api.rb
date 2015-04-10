@@ -9,19 +9,8 @@ require 'open_uri_redirections'
 
 module OgpImageAPI
   class API < Grape::API
-    version 'v1', using: :header, vendor: 'nosu'
-    format :json
-    prefix :api
-  
-    helpers do
-    end
-
-    resource :test do
-      desc "For testing."
-      get :test do
-        "Test Success"
-      end
-    end
+    content_type :binary, 'application/octet-stream'
+    format :binary
   
     resource :og_image do
       desc "Return a ogp image."
@@ -37,11 +26,12 @@ module OgpImageAPI
           image.get_reduced_image
         end
       end
-  
     end
+
   end
   
   class OgpImage
+
     def initialize(url)
       @url = url
       @image_url = get_ogp_image_url
@@ -92,5 +82,6 @@ module OgpImageAPI
         nil
       end
     end
+
   end
 end
